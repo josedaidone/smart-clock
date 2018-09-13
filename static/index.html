@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+.block {
+    display: block;
+    width: 40%;
+    border: none;
+    background-color: #4CAF50;
+    color: white;
+    padding: 14px 28px;
+    font-size: 16px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.block:hover {
+    background-color: #ddd;
+    color: black;
+}
+.texto {
+  background-color: #FFF;
+  color: black;
+  width: 300px;
+  font-size: 30px;
+}
+</style>
+</head>
+<body>
+  <button type="submit" onclick="start()" class="block">START</button><p>
+  <button type="submit" onclick="stop()" class="block">STOP</button><p>
+
+  TEXTO: <input type="text" name="enter" class="texto" value="" id="lolz"/><p>
+   <input type="button" value="SEND MSG" class="block" onclick="text();"/>
+   <div id="log"></div>
+
+  <script type="text/javascript">
+
+  function stop() {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+           if (this.readyState == 4 && this.status == 200) {
+             document.getElementById('log').innerHTML = '<br>'+this.responseText;
+               console.log(this.responseText);
+               // document.write("<br>stop");
+           }
+      };
+      xhttp.open("GET", "http://jdaidone.ddns.net/stop/", true);
+      // xhttp.setRequestHeader("Content-type", "application/json");
+      xhttp.send();
+  }
+  function start() {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+           if (this.readyState == 4 && this.status == 200) {
+             document.getElementById('log').innerHTML = '<br>'+this.responseText;
+               console.log(this.responseText);
+           }
+      };
+      xhttp.open("GET", "http://jdaidone.ddns.net/start/", true);
+      // xhttp.setRequestHeader("Content-type", "application/json");
+      xhttp.send();
+  }
+  function text(){
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+           if (this.readyState == 4 && this.status == 200) {
+             document.getElementById('log').innerHTML = '<br>'+this.responseText;
+               console.log(this.responseText);
+           }
+      };
+      xhttp.open("GET", "http://jdaidone.ddns.net/text/"+lolz.value, true);
+      // xhttp.setRequestHeader("Content-type", "application/json");
+      xhttp.send();
+      // alert(lolz.value);
+    }
+  </script>
+</body>
+</html>
