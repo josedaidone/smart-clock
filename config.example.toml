@@ -1,0 +1,70 @@
+# Copy this file to config.toml and edit it. config.toml is git-ignored
+# because it holds your password hash.
+#
+# Every setting is optional; what you see here are sensible starting values.
+
+[display]
+dio = 17                    # GPIO numbers (BCM), same wiring as before
+clk = 27
+stb = 22
+brightness = 5              # 0 (dimmest) to 7
+led_color = "red"           # "green" works on two-colour boards
+buttons = true              # false ignores the board's buttons
+scroll_step = 0.3           # seconds per step when a long message scrolls
+time_format = "%H %M %S"    # "%I %M %S" for a 12-hour clock
+date_format = "%d-%m-%y"
+
+[dimming]
+enabled = true
+night_start = "22:00"
+night_end = "07:00"
+night_brightness = 0
+
+[messages]
+default_duration = 15       # seconds a message stays up
+max_length = 200
+max_queue = 10
+
+# Messages on a schedule. `days` and `duration` are optional.
+[[schedule]]
+time = "19:00"
+text = "sete horas - beijnho ba bunda"
+duration = 60
+
+[[schedule]]
+time = "20:00"
+text = "ja sao oito - hora de comer biscoito"
+duration = 60
+
+# An alarm repeats (and buzzes, if you have a buzzer) until you press S1 to
+# dismiss or S2 to snooze, or until [alarm] timeout runs out.
+# [[schedule]]
+# time = "07:30"
+# days = ["mon", "tue", "wed", "thu", "fri"]
+# text = "bom dia"
+# alarm = true
+
+[alarm]
+timeout = 120               # seconds before an ignored alarm gives up
+snooze_minutes = 5
+
+[buzzer]
+enabled = false
+pin = 10                    # the pin the old teste.py used
+
+[weather]
+enabled = false             # outdoor temperature from open-meteo.com (no key needed)
+latitude = 0.0
+longitude = 0.0
+unit = "celsius"            # or "fahrenheit"
+rotate = true               # show it for 3 seconds every minute
+
+[web]
+enabled = true
+host = "0.0.0.0"            # use "127.0.0.1" behind Tailscale Serve or a tunnel
+port = 5000
+
+[web.users]
+# The web control stays off until at least one user is listed here.
+# Run:  python -m smart_clock hash-password --user yourname
+# and paste the line it prints below.

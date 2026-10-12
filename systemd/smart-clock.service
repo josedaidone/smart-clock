@@ -1,0 +1,22 @@
+# Copy to /etc/systemd/system/smart-clock.service, then:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now smart-clock
+#
+# Change "pi" and the paths below if your user or folder is different.
+
+[Unit]
+Description=Smart Clock (TM1638 display and web control)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pi
+SupplementaryGroups=gpio
+WorkingDirectory=/home/pi/smart-clock
+ExecStart=/home/pi/smart-clock/.venv/bin/python -m smart_clock run --config /home/pi/smart-clock/config.toml
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

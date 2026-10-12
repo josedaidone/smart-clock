@@ -1,0 +1,114 @@
+:root {
+  --bg: #15110f;
+  --panel: #1f1917;
+  --board: #0b0808;
+  --text: #efe7e2;
+  --muted: #a3948c;
+  --line: #3a2f2b;
+  --red: #ff3b2f;
+  --green: #48e06b;
+  --unlit: #2a1513;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 24px 16px 48px;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+main {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+h1 {
+  margin: 0 0 16px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.board {
+  padding: 14px 14px 18px;
+  background: var(--board);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.leds, .digits {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+}
+
+.leds { margin-bottom: 12px; }
+
+.led {
+  justify-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--unlit);
+}
+.led.lit { background: var(--red); box-shadow: 0 0 8px var(--red); }
+.led.green { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+.digit { display: block; width: 100%; }
+.digit rect, .digit circle { fill: var(--unlit); }
+.digit .lit { fill: var(--red); filter: drop-shadow(0 0 3px var(--red)); }
+
+.state {
+  min-height: 1.5em;
+  margin: 10px 2px 22px;
+  color: var(--muted);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+label {
+  display: block;
+  margin: 18px 0 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.row { display: flex; gap: 8px; }
+.controls { margin-top: 16px; flex-wrap: wrap; }
+.controls button { flex: 1 1 0; }
+
+input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 12px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+}
+
+input[type="range"] { width: 100%; accent-color: var(--red); }
+
+button {
+  padding: 11px 16px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--red); border-color: var(--red); color: #1a0705; font-weight: 600; }
+
+input:focus-visible, button:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+
+.log { min-height: 1.5em; margin-top: 18px; font-size: 14px; color: var(--muted); }
+.log.error { color: var(--red); }

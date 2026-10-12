@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart Clock</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <h1>Smart Clock</h1>
+
+    <section class="board" aria-label="What the clock is showing right now">
+      <div id="leds" class="leds"></div>
+      <div id="digits" class="digits"></div>
+    </section>
+    <p id="state" class="state">Connecting…</p>
+
+    <form id="message-form">
+      <label for="text">Message</label>
+      <div class="row">
+        <input id="text" name="text" type="text" maxlength="200"
+               autocomplete="off" placeholder="Type something to show" required>
+        <button type="submit" class="primary">Send</button>
+      </div>
+    </form>
+
+    <div class="row controls">
+      <button id="on" type="button">Display on</button>
+      <button id="off" type="button">Display off</button>
+      <button id="dismiss" type="button">Dismiss</button>
+    </div>
+
+    <label for="brightness">Brightness</label>
+    <input id="brightness" type="range" min="0" max="7" step="1" value="5">
+
+    <p id="log" class="log" role="status"></p>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

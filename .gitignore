@@ -1,0 +1,7 @@
+# Your settings and password hash
+config.toml
+
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
