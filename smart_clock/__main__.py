@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import logging
+import secrets
 import signal
 import sys
 import threading
@@ -13,7 +14,7 @@ from pathlib import Path
 from . import font
 from .buzzer import GpioBuzzer, NullBuzzer
 from .config import Config, ConfigError, load_config
-from .display import Display, SimBackend, TM1638Backend
+from .display import Display, TM1638Backend
 from .engine import SmartClock
 
 log = logging.getLogger("smart_clock")
@@ -26,7 +27,8 @@ def main(argv=None) -> int:
     run = commands.add_parser("run", help="run the clock and its web control")
     run.add_argument("--config", default="config.toml")
     run.add_argument("--simulate", action="store_true",
-                     help="no hardware: draw the display in the terminal")
+                     help="no hardware: emulate the board, with a page to control it")
+    run.add_argument("--port", type=int, help="web port (overrides the config)")
     run.add_argument("--no-web", action="store_true", help="clock only")
     run.add_argument("--verbose", action="store_true")
 
@@ -56,17 +58,23 @@ def _run(args) -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     logging.getLogger("waitress").setLevel(logging.WARNING)
-    if args.simulate and not Path(args.config).exists():
-        log.info("%s not found, simulating with default settings", args.config)
-        config = Config()
-    else:
-        config = load_config(args.config)
+    config = _load_config(args)
+    if args.port:
+        config.web.port = args.port
+    use_web = config.web.enabled and not args.no_web
 
+    emulator = None
+    engine_clock = None
     if args.simulate:
-        display = Display(SimBackend(), config.display.brightness,
+        from .emulator import Emulator
+
+        emulator = Emulator(config.display)
+        draw_in_terminal = not use_web and sys.stdout.isatty()
+        display = Display(emulator.backend, config.display.brightness,
                           config.display.led_color,
-                          on_change=_terminal_painter() if sys.stdout.isatty() else None)
-        buzzer = NullBuzzer()
+                          on_change=_terminal_painter() if draw_in_terminal else None)
+        buzzer = emulator.buzzer
+        engine_clock = emulator.clock
     else:
         d = config.display
         display = Display(TM1638Backend(d.dio, d.clk, d.stb, d.brightness),
@@ -80,33 +88,66 @@ def _run(args) -> int:
                           config.weather.unit)
         weather.start()
 
-    clock = SmartClock(config, display, buzzer=buzzer, weather=weather)
+    clock = SmartClock(config, display, buzzer=buzzer, weather=weather, clock=engine_clock)
     for signum in (signal.SIGINT, signal.SIGTERM):
         signal.signal(signum, lambda *_: clock.stop())
 
-    if config.web.enabled and not args.no_web:
-        _start_web(clock, config)
+    if use_web and not _start_web(clock, config, emulator) and emulator is not None:
+        return 1  # the emulator is its page; no point running without it
 
     clock.run()
     return 0
 
 
-def _start_web(clock: SmartClock, config: Config) -> None:
+def _load_config(args) -> Config:
+    if not args.simulate or Path(args.config).exists():
+        return load_config(args.config)
+    # Trying it out without a config.toml: use the example so there is a schedule.
+    example = Path(__file__).resolve().parent.parent / "config.example.toml"
+    if example.exists():
+        log.info("%s not found, using %s", args.config, example.name)
+        return load_config(example)
+    log.info("%s not found, using default settings", args.config)
+    return Config()
+
+
+def _start_web(clock: SmartClock, config: Config, emulator=None) -> bool:
+    """Start the web control in the background. Returns False if it is not running."""
+    login = None
+    if emulator is not None and not config.web.users:
+        # Nothing real is being controlled, so make up a login for this run
+        # and keep it on this computer only.
+        from werkzeug.security import generate_password_hash
+
+        login = ("demo", secrets.token_urlsafe(6))
+        config.web.users = {login[0]: generate_password_hash(login[1])}
+        config.web.host = "127.0.0.1"
     if not config.web.users:
         log.warning(
             "web control is OFF: no users in [web.users]. "
             "Run `python -m smart_clock hash-password` and add the line it prints."
         )
-        return
-    from .web import create_app, serve
+        return False
+    from .web import create_app, make_server
 
-    app = create_app(clock, config)
-    thread = threading.Thread(
-        target=serve, args=(app, config.web.host, config.web.port),
-        name="web", daemon=True,
-    )
-    thread.start()
-    log.info("web control on http://%s:%d", config.web.host, config.web.port)
+    app = create_app(clock, config, emulator=emulator)
+    try:
+        server = make_server(app, config.web.host, config.web.port)
+    except OSError as exc:
+        log.error("web control could not start on %s:%d (%s). "
+                  "Is something else using the port? Try --port 8080.",
+                  config.web.host, config.web.port, exc)
+        return False
+    threading.Thread(target=server.run, name="web", daemon=True).start()
+    shown_host = "127.0.0.1" if config.web.host in ("0.0.0.0", "::") else config.web.host
+    base = f"http://{shown_host}:{config.web.port}"
+    log.info("web control on %s", base)
+    if emulator is not None:
+        print(f"\n  Emulator:  {base}/emulator")
+        if login:
+            print(f"  Login:     {login[0]} / {login[1]}   (made up for this run)")
+        print("  Stop with Ctrl+C\n", flush=True)
+    return True
 
 
 def _hash_password(user: str) -> int:

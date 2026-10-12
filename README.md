@@ -134,15 +134,44 @@ Don't forward a port to it. The login is HTTP Basic, which is only safe over HTT
 
 If the page loads behind a proxy but every button answers 403, the proxy is rewriting the `Host` header; turn that off.
 
-## Without a Pi
+## Try it without a Pi (the emulator)
+
+`run --simulate` runs the real clock and the real web control against an emulated board, on any computer:
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/python -m smart_clock run --simulate    # draws the display in the terminal
+python -m venv .venv
+
+# Windows
+.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\python -m smart_clock run --simulate
+
+# macOS / Linux
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m smart_clock run --simulate
+```
+
+It prints the emulator's address and a login made up for that run:
+
+```
+  Emulator:  http://127.0.0.1:5000/emulator
+  Login:     demo / 3fXk0aQz   (made up for this run)
+```
+
+The emulator page has the board on one side (LEDs, digits, buzzer, and the eight buttons, which you press with the mouse or keys 1 to 8) and the real web control on the other. "Board clock" jumps the board's time, so you can land ten seconds before a scheduled message, an alarm or night dimming instead of waiting for it.
+
+- With no `config.toml` it uses `config.example.toml`. With your own `config.toml` it uses your schedule and your users.
+- If port 5000 is busy (macOS uses it for AirPlay), add `--port 8080`.
+- To emulate the TM1638 chip itself, also run `pip install --no-deps git+https://github.com/thilaire/rpi-TM1638` in the same environment. The real driver library then bit-bangs a fake GPIO, and the page shows what the chip decoded. Without it the board is a plain in-memory stand-in.
+- `run --simulate --no-web` draws the display in the terminal instead.
+
+## Tests
+
+```bash
+.venv/bin/pip install -r requirements-dev.txt
 .venv/bin/python -m pytest
 ```
 
-The tests run the clock against a simulated board with a fake clock, so a minute of schedule takes milliseconds. `tests/test_tm1638_backend.py` drives the real `rpi_TM1638` library through a fake GPIO that decodes the wire protocol; it is skipped if the library isn't installed.
+The tests run the clock against the emulated board with a fake clock, so a minute of schedule takes milliseconds. `tests/test_tm1638_backend.py` drives the real `rpi_TM1638` library through the fake GPIO; it is skipped if the library isn't installed.
 
 ## Coming from the old scripts
 

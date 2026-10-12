@@ -7,6 +7,7 @@ state is a JSON POST, and requests from other websites are refused.
 
 from __future__ import annotations
 
+import datetime as dt
 import hashlib
 import hmac
 import logging
@@ -34,7 +35,8 @@ MAX_FAILED_LOGINS = 10          # per address ...
 FAILED_LOGIN_WINDOW = 5 * 60    # ... within this many seconds
 
 
-def create_app(clock, config: Config) -> Flask:
+def create_app(clock, config: Config, emulator=None) -> Flask:
+    """Build the web control. `emulator` is set only by `run --simulate`."""
     app = Flask(__name__, static_folder=None)
     app.config["MAX_CONTENT_LENGTH"] = 8 * 1024
 
@@ -111,12 +113,14 @@ def create_app(clock, config: Config) -> Flask:
 
     @app.after_request
     def security_headers(response):
+        # The emulator page shows the control page in a frame; nothing else may.
+        framing = "'self'" if emulator is not None else "'none'"
         response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; frame-ancestors 'none'"
+            f"default-src 'self'; frame-ancestors {framing}"
         )
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
-        if request.path.startswith("/api/"):
+        if request.path.startswith(("/api/", "/emulator/api/")):
             response.headers["Cache-Control"] = "no-store"
         return response
 
@@ -136,6 +140,10 @@ def create_app(clock, config: Config) -> Flask:
     @app.get("/app.js")
     def script():
         return send_from_directory(STATIC_DIR, "app.js")
+
+    @app.get("/board.js")
+    def board_script():
+        return send_from_directory(STATIC_DIR, "board.js")
 
     @app.get("/style.css")
     def stylesheet():
@@ -199,14 +207,90 @@ def create_app(clock, config: Config) -> Flask:
         clock.dismiss()
         return jsonify({"dismissed": True})
 
+    if emulator is not None:
+        _add_emulator_routes(app, limiter, config, emulator)
     return app
 
 
-def serve(app: Flask, host: str, port: int) -> None:
-    """Serve with waitress (a production server), never Flask's debug server."""
-    from waitress import serve as waitress_serve
+def _add_emulator_routes(app: Flask, limiter: Limiter, config: Config, emulator) -> None:
+    """The emulated board: what it shows, its buttons and its clock."""
 
-    waitress_serve(app, host=host, port=port, threads=4, ident="smart-clock")
+    @app.get("/emulator")
+    def emulator_page():
+        return send_from_directory(STATIC_DIR, "emulator.html")
+
+    @app.get("/emulator.js")
+    def emulator_script():
+        return send_from_directory(STATIC_DIR, "emulator.js")
+
+    @app.get("/emulator.css")
+    def emulator_stylesheet():
+        return send_from_directory(STATIC_DIR, "emulator.css")
+
+    @app.get("/emulator/api/info")
+    def emulator_info():
+        dimming = config.dimming
+        return jsonify({
+            "wire_level": emulator.wire_level,
+            "buttons_enabled": config.display.buttons,
+            "schedule": [
+                {"time": entry.time.strftime("%H:%M"), "text": entry.text,
+                 "alarm": entry.alarm,
+                 "days": sorted(entry.days) if entry.days is not None else None}
+                for entry in config.schedule
+            ],
+            "night_start": dimming.night_start.strftime("%H:%M") if dimming.enabled else None,
+        })
+
+    @app.get("/emulator/api/state")
+    @limiter.exempt  # the page redraws the board many times a second
+    def emulator_state():
+        return jsonify(emulator.state())
+
+    @app.post("/emulator/api/button")
+    @limiter.exempt
+    def emulator_button():
+        body = _body()
+        button, down = body.get("button"), body.get("down")
+        if isinstance(button, bool) or not isinstance(button, int) or not 0 <= button <= 7:
+            return _error(400, "button must be 0 to 7")
+        if not isinstance(down, bool):
+            return _error(400, "down must be true or false")
+        emulator.set_button(button, down)
+        return jsonify({"button": button, "down": down})
+
+    @app.post("/emulator/api/time")
+    def emulator_time():
+        body = _body()
+        if body.get("reset") is True:
+            emulator.clock.reset()
+        else:
+            try:
+                parts = [int(part) for part in str(body.get("time", "")).split(":")]
+                when = dt.time(*parts) if 2 <= len(parts) <= 3 else None
+            except ValueError:
+                when = None
+            if when is None:
+                return _error(400, 'time must look like "18:59:50"')
+            emulator.clock.set_time(when)
+        return jsonify({"time": emulator.clock.now().strftime("%H:%M:%S")})
+
+
+def make_server(app: Flask, host: str, port: int):
+    """A waitress server (production grade), bound now so a busy port fails loudly.
+
+    Call .run() on the result to serve. Never Flask's debug server.
+    """
+    from waitress import create_server
+
+    sockets: dict = {}
+    try:
+        return create_server(app, map=sockets, host=host, port=port, threads=4,
+                             ident="smart-clock")
+    except OSError:
+        for half_open in list(sockets.values()):  # don't leave waitress's sockets behind
+            half_open.close()
+        raise
 
 
 def _body() -> dict:

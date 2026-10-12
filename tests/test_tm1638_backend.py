@@ -1,114 +1,28 @@
 """The real rpi_TM1638 library, driven through a fake GPIO that decodes the
-bit-banged protocol the way the chip does.
+bit-banged protocol the way the chip does (smart_clock.emulator.FakeChip).
 
 This is as close to the board as a test can get without one. It is skipped
 when rpi_TM1638 is not installed.
 """
 
+import importlib.util
 import sys
-import types
 
 import pytest
 
 from smart_clock.display import Display, TM1638Backend
+from smart_clock.emulator import FakeChip, install_fake_gpio
 
 DIO, CLK, STB = 17, 27, 22
 
 
-class FakeChip:
-    """Stands in for RPi.GPIO and for the TM1638 on the other end of the wires."""
-
-    BCM, OUT, IN, PUD_UP = "BCM", "OUT", "IN", "PUD_UP"
-
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.level = {}
-        self.memory = [0] * 16       # even addresses: digits, odd: LEDs
-        self.keys = [0, 0, 0, 0]     # what a key scan returns
-        self.display_on = False
-        self.brightness = None
-        self.fixed_address = False
-        self._begin()
-
-    # ---- RPi.GPIO surface
-    def setwarnings(self, flag):
-        pass
-
-    def setmode(self, mode):
-        assert mode == self.BCM
-
-    def setup(self, pin, direction, pull_up_down=None):
-        pass
-
-    def output(self, pin, value):
-        value = bool(value)
-        before = self.level.get(pin)
-        self.level[pin] = value
-        if pin == STB:
-            if before is not False and value is False:
-                self._begin()
-        elif pin == CLK and self.level.get(STB) is False:
-            if value and before is False and not self.reading:
-                self._clock_in(self.level.get(DIO, False))
-            elif not value and before and self.reading:
-                self._clock_out()
-
-    def input(self, pin):
-        assert pin == DIO
-        return self.read_level
-
-    # ---- the chip
-    def _begin(self):
-        self.bits = []
-        self.reading = False
-        self.address = None
-        self.read_position = 0
-        self.read_level = False
-
-    def _clock_in(self, bit):
-        self.bits.append(bit)
-        if len(self.bits) == 8:
-            byte = sum(1 << i for i, b in enumerate(self.bits) if b)  # LSB first
-            self.bits = []
-            self._byte(byte)
-
-    def _clock_out(self):
-        byte, bit = divmod(self.read_position, 8)
-        self.read_level = bool(self.keys[byte] >> bit & 1)
-        self.read_position += 1
-
-    def _byte(self, byte):
-        if self.address is not None:            # data following an address command
-            self.memory[self.address] = byte
-            if not self.fixed_address:
-                self.address = (self.address + 1) % 16
-        elif byte & 0xC0 == 0x40:               # data command
-            self.reading = bool(byte & 0x02)
-            self.fixed_address = bool(byte & 0x04)
-        elif byte & 0xC0 == 0xC0:               # address command
-            self.address = byte & 0x0F
-        elif byte & 0xC0 == 0x80:               # display control
-            self.display_on = bool(byte & 0x08)
-            self.brightness = byte & 0x07
-
-
 @pytest.fixture(scope="module")
 def chip():
-    fake = FakeChip()
-    module = types.ModuleType("RPi.GPIO")
-    for name in ("BCM", "OUT", "IN", "PUD_UP", "setwarnings", "setmode", "setup",
-                 "output", "input"):
-        setattr(module, name, getattr(fake, name))
-    package = types.ModuleType("RPi")
-    package.GPIO = module
+    if importlib.util.find_spec("rpi_TM1638") is None:
+        pytest.skip("rpi_TM1638 is not installed")
     saved = {name: sys.modules.get(name) for name in ("RPi", "RPi.GPIO")}
-    for name in list(sys.modules):
-        if name.startswith("rpi_TM1638"):
-            del sys.modules[name]
-    sys.modules["RPi"], sys.modules["RPi.GPIO"] = package, module
-    pytest.importorskip("rpi_TM1638")
+    fake = FakeChip(DIO, CLK, STB)
+    install_fake_gpio(fake)
     yield fake
     for name, original in saved.items():
         if original is None:
@@ -120,6 +34,7 @@ def chip():
 @pytest.fixture
 def display(chip):
     chip.reset()
+    install_fake_gpio(chip)   # another test may have pointed the library elsewhere
     return Display(TM1638Backend(DIO, CLK, STB, 5), brightness=5)
 
 

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart Clock emulator</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="emulator.css">
+</head>
+<body class="bench">
+  <header>
+    <h1>Smart Clock emulator</h1>
+    <p class="note">
+      The clock and the web control are the real code. Only the board is emulated:
+      <span id="mode">checking…</span>
+    </p>
+  </header>
+
+  <div class="columns">
+    <section>
+      <h2>The board on your desk</h2>
+      <div class="pcb" id="pcb">
+        <div class="silk">TM1638 LED&amp;KEY <span id="buzzer" class="buzzer">buzzer</span></div>
+        <div id="leds" class="leds"></div>
+        <div class="window"><div id="digits" class="digits"></div></div>
+        <div id="buttons" class="buttons"></div>
+      </div>
+      <p class="hint">Press the buttons with the mouse, or keys 1 to 8. Hold them like real ones.</p>
+      <p class="readout">
+        <span>Brightness <b id="brightness-level">–</b>/7</span>
+        <span>Board time <b id="board-time">–</b></span>
+        <label><input type="checkbox" id="sound"> Buzzer sound</label>
+      </p>
+
+      <h2>Board clock</h2>
+      <p class="hint">Jump the board's clock to try the schedule without waiting.</p>
+      <div class="row">
+        <input id="time" type="time" step="1" value="18:59:50" aria-label="Time to jump to">
+        <button id="set-time" type="button">Set time</button>
+        <button id="reset-time" type="button">Back to now</button>
+      </div>
+      <div id="jumps" class="jumps"></div>
+      <p id="log" class="log" role="status"></p>
+    </section>
+
+    <section>
+      <h2>The web control on your phone <a href="/" target="_blank" rel="noopener">open in a tab</a></h2>
+      <iframe src="/" title="The real web control"></iframe>
+    </section>
+  </div>
+
+  <script src="board.js"></script>
+  <script src="emulator.js"></script>
+</body>
+</html>
