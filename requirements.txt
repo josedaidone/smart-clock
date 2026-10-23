@@ -1,0 +1,8 @@
+Flask>=3.0
+Flask-HTTPAuth>=4.8
+Flask-Limiter>=3.5
+waitress>=3.0
+tomli>=2.0; python_version < "3.11"
+
+# On the Pi, also install the display driver (it is not on PyPI) -- see README:
+#   pip install --no-deps git+https://github.com/thilaire/rpi-TM1638
